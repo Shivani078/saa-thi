@@ -12,7 +12,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 
 # --- Custom Utility Import ---
-from utils import get_upcoming_festivals_for_prompt
+from utils import get_rich_context
 
 # --- Pydantic Models for Structured JSON Response ---
 # These models are now enhanced with detailed descriptions to match the frontend component's needs.
@@ -90,13 +90,19 @@ except Exception as e:
 
 # --- API Endpoint for Inventory Planner ---
 @router.get("/full-report", response_model=PlannerResponse)
-async def get_full_planner_report(location: str = "Delhi"):
+async def get_full_planner_report(
+    location: str = "Delhi",
+    pincode: Optional[str] = Query(None),
+    products: Optional[List[str]] = Query(None)
+):
     if not model:
         raise HTTPException(status_code=500, detail="Groq API model is not configured.")
 
     try:
-        # 1. Fetch real-time festival data using the new centralized utility function
-        real_festivals = get_upcoming_festivals_for_prompt()
+        # 1. Fetch rich context using the new centralized utility function
+        context = await get_rich_context(pincode, products)
+        real_festivals = context.get("festivals", "No major festivals found.")
+
         if not real_festivals or "No major festivals" in real_festivals:
             print("Warning: Could not fetch real-time festival data. The AI will generate festivals from its own knowledge.")
 
@@ -108,6 +114,8 @@ async def get_full_planner_report(location: str = "Delhi"):
             template="""
             You are an expert Indian retail and inventory planning AI for Meesho sellers.
             The seller is located in: {location}.
+            Their product catalog is: {products}
+            The local weather is: {weather}
 
             Your task is to generate a complete inventory plan as a single, valid JSON object.
             The data should be realistic and relevant for a seller in {location}.
@@ -121,7 +129,7 @@ async def get_full_planner_report(location: str = "Delhi"):
 
             {format_instructions}
             """,
-            input_variables=["location", "real_festivals"],
+            input_variables=["location", "real_festivals", "products", "weather"],
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
 
@@ -129,7 +137,12 @@ async def get_full_planner_report(location: str = "Delhi"):
         chain = prompt_template | model | parser
         
         # 5. Invoke the chain with the query
-        response = await chain.ainvoke({"location": location, "real_festivals": real_festivals})
+        response = await chain.ainvoke({
+            "location": location,
+            "real_festivals": real_festivals,
+            "products": context.get("products", "Not available."),
+            "weather": context.get("weather", "Not available.")
+        })
         
         # 6. Post-process the response to fix dates and calculate daysLeft accurately
         today = datetime.now().date()

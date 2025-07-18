@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from indian_festivals.festival import IndianFestivals
 import os
 import requests
+from typing import Optional, List
 
 def _get_raw_upcoming_festivals():
     """
@@ -97,10 +98,10 @@ def _format_product_data_for_prompt(products):
         product_lines.append(f"- Name: {p.get('name', 'N/A')}, Category: {p.get('category', 'N/A')}, Price: {p.get('price', 'N/A')}, Stock: {p.get('stock', 'N/A')}")
     return "Current Product Inventory:\n" + "\n".join(product_lines)
 
-def get_rich_context(products: list, pincode: str):
+async def get_rich_context(pincode: Optional[str] = None, products: Optional[List[str]] = None):
     """
-    Gathers and formats all available context (festivals, weather, products)
-    into a single string for AI prompts.
+    Asynchronously fetches and aggregates rich context including upcoming festivals,
+    weather, and product inventory for AI prompts.
     """
     # 1. Get festivals
     festivals = _get_raw_upcoming_festivals()
@@ -117,24 +118,28 @@ def get_rich_context(products: list, pincode: str):
     # 3. Get products
     product_str = _format_product_data_for_prompt(products)
 
-    # Combine all context into one string
-    full_context = f"--- START CONTEXT ---\n\n{weather_str}\n\n{product_str}\n\n{festival_str}\n\n--- END CONTEXT ---"
+    # ALWAYS return a dictionary
+    return {
+        "festivals": festival_str,
+        "weather": weather_str,
+        "products": product_str
+    }
+
+# This function is being deprecated in favor of get_rich_context
+# def get_upcoming_festivals_for_prompt():
+#     """Formats upcoming festivals as a comma-separated string for the planner's AI prompt."""
+#     upcoming_festivals = _get_raw_upcoming_festivals()
+#     if not upcoming_festivals:
+#         return "No major festivals in the next few months."
     
-    return full_context
+#     # Return up to 15 festivals for the prompt
+#     return ", ".join([f"{f['name']} ({f['date'].strftime('%Y-%m-%d')})" for f in upcoming_festivals[:15]])
 
-def get_upcoming_festivals_for_prompt():
-    """Formats upcoming festivals as a comma-separated string for the planner's AI prompt."""
-    upcoming_festivals = _get_raw_upcoming_festivals()
-    if not upcoming_festivals:
-        return "No major festivals in the next few months."
-    
-    # Return up to 15 festivals for the prompt
-    return ", ".join([f"{f['name']} ({f['date'].strftime('%Y-%m-%d')})" for f in upcoming_festivals[:15]])
+# This function is also being deprecated
+# def get_upcoming_festivals_for_chat():
+#     """Formats upcoming festivals as a newline-separated string for the chat's context."""
+#     upcoming_festivals = _get_raw_upcoming_festivals()
+#     if not upcoming_festivals:
+#         return "No major festivals in the next 90 days."
 
-def get_upcoming_festivals_for_chat():
-    """Formats upcoming festivals as a newline-separated string for the chat's context."""
-    upcoming_festivals = _get_raw_upcoming_festivals()
-    if not upcoming_festivals:
-        return "No major festivals in the next 90 days."
-
-    return "\n".join([f"- {f['name']} on {f['date'].strftime('%B %d, %Y')}" for f in upcoming_festivals]) 
+#     return "\n".join([f"- {f['name']} on {f['date'].strftime('%B %d, %Y')}" for f in upcoming_festivals]) 

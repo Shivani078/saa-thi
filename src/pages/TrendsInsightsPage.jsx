@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, MapPin, Target, AlertTriangle, Calendar, Filter, RefreshCw, Eye, Zap, Clock, AlertCircle, Flame, Rocket, Sun } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { auth } from "../auth/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { databases, ID } from "../appwrite/client";
+import { Query } from "appwrite";
+
+const backendURL = import.meta.env.VITE_BACKEND_URL;
+const APPWRITE_DB_ID = import.meta.env.VITE_APPWRITE_DB_ID;
+const APPWRITE_COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_ID;
+const APPWRITE_PROFILES_COLLECTION_ID = import.meta.env.VITE_APPWRITE_PROFILES_COLLECTION_ID;
 
 const TrendsInsightsPage = () => {
     const [selectedCategory, setSelectedCategory] = useState('kurtis');
@@ -8,13 +17,65 @@ const TrendsInsightsPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [trendsData, setTrendsData] = useState(null);
-    const backendURL = import.meta.env.VITE_BACKEND_URL;
+    const [user, setUser] = useState(null);
+    const [userProfile, setUserProfile] = useState(null);
+    const [products, setProducts] = useState([]);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            if (currentUser) {
+                checkUserProfile(currentUser);
+                fetchUserProducts(currentUser);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const checkUserProfile = async (currentUser) => {
+        try {
+            const profile = await databases.getDocument(APPWRITE_DB_ID, APPWRITE_PROFILES_COLLECTION_ID, currentUser.uid);
+            setUserProfile(profile);
+        } catch (error) {
+            console.error("Error checking user profile:", error);
+        }
+    };
+
+    const fetchUserProducts = async (currentUser) => {
+        try {
+            const res = await databases.listDocuments(
+                APPWRITE_DB_ID,
+                APPWRITE_COLLECTION_ID,
+                [Query.equal('user_id', currentUser.uid)]
+            );
+            setProducts(res.documents);
+        } catch (err) {
+            console.error("Failed to fetch user products:", err);
+        }
+    };
 
     const fetchData = async () => {
         setIsLoading(true);
         setError(null);
+
+        // Wait until we have the user profile and products
+        if (!userProfile || products.length === 0) {
+            // We can set loading to false or show a specific message
+            // For now, we'll just wait. The useEffect below will trigger this.
+            return;
+        }
+
         try {
-            const response = await fetch(`${backendURL}/api/trends/full-trends-report?location=${selectedRegion}&category=${selectedCategory}`);
+            const params = new URLSearchParams({
+                location: selectedRegion,
+                category: selectedCategory,
+                pincode: userProfile.pinCode,
+            });
+            
+            // Appending products as a list
+            products.forEach(p => params.append('products', p.name));
+
+            const response = await fetch(`${backendURL}/api/trends/full-trends-report?${params.toString()}`);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ detail: 'Network response was not ok' }));
                 throw new Error(errorData.detail || 'Failed to fetch data');
@@ -30,8 +91,11 @@ const TrendsInsightsPage = () => {
     };
 
     useEffect(() => {
-        fetchData();
-    }, [selectedCategory, selectedRegion]);
+        // This will run when the component mounts, and again if the user, profile, or products change.
+        if (user && userProfile && products) {
+            fetchData();
+        }
+    }, [user, userProfile, products, selectedCategory, selectedRegion]);
 
     const refreshData = () => {
         fetchData();
