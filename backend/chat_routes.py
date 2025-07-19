@@ -84,7 +84,7 @@ async def chat_with_copilot_ai(
         products = []
         
     # Get all context from the new utility function
-    rich_context = get_rich_context(products=products, pincode=pincode)
+    rich_context = await get_rich_context(products=products, pincode=pincode)
     
     if language.lower() == 'hindi':
         language_instruction = "You must respond only in Hindi."

@@ -38,7 +38,7 @@ async def get_ai_dashboard_summary(
         raise HTTPException(status_code=500, detail="AI model is not configured.")
 
     # 1. Get the rich context
-    rich_context = get_rich_context(products=products, pincode=pincode)
+    rich_context = await get_rich_context(products=products, pincode=pincode)
 
     # 2. Set up the Pydantic parser
     parser = PydanticOutputParser(pydantic_object=AISummary)
@@ -73,4 +73,4 @@ async def get_ai_dashboard_summary(
         return summary_response
     except Exception as e:
         print(f"Error invoking AI chain for summary: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate AI summary. Error: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to generate AI summary. Error: {str(e)}")

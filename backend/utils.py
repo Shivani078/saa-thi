@@ -1,7 +1,7 @@
 import json
 import calendar
 from datetime import datetime, timedelta
-from indian_festivals.festival import IndianFestivals
+from custom_packages.indian_festivals.festivals import IndianFestivals
 import os
 import requests
 from typing import Optional, List
@@ -103,7 +103,6 @@ async def get_rich_context(pincode: Optional[str] = None, products: Optional[Lis
     Asynchronously fetches and aggregates rich context including upcoming festivals,
     weather, and product inventory for AI prompts.
     """
-    # 1. Get festivals
     festivals = _get_raw_upcoming_festivals()
     festival_str = "Upcoming Festivals (next 90 days):\n"
     if festivals:
@@ -111,14 +110,20 @@ async def get_rich_context(pincode: Optional[str] = None, products: Optional[Lis
     else:
         festival_str += "No major festivals in the next 90 days."
     
-    # 2. Get weather
     season, weather = _get_weather_for_pincode(pincode)
     weather_str = f"Current Season & Weather:\nIt is currently {season} in India. {weather}"
 
-    # 3. Get products
-    product_str = _format_product_data_for_prompt(products)
+    # 🔁 Safe parsing for products if sent as strings
+    parsed_products = []
+    if products:
+        for item in products:
+            try:
+                parsed_products.append(json.loads(item) if isinstance(item, str) else item)
+            except json.JSONDecodeError:
+                continue
 
-    # ALWAYS return a dictionary
+    product_str = _format_product_data_for_prompt(parsed_products)
+
     return {
         "festivals": festival_str,
         "weather": weather_str,
@@ -142,4 +147,4 @@ async def get_rich_context(pincode: Optional[str] = None, products: Optional[Lis
 #     if not upcoming_festivals:
 #         return "No major festivals in the next 90 days."
 
-#     return "\n".join([f"- {f['name']} on {f['date'].strftime('%B %d, %Y')}" for f in upcoming_festivals]) 
+#     return "\n".join([f"- {f['name']} on {f['date'].strftime('%B %d, %Y')}" for f in upcoming_festivals])
