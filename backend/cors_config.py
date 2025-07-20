@@ -8,7 +8,8 @@ origins = [
     "http://localhost:3000",    # Default for create-react-app
     "http://localhost:5173",    # Default for Vite
     "http://127.0.0.1:5173",
-    "https://buddy-j3f5.vercel.app",  # <-- Add your Vercel frontend URL here
+    "https://buddy-j3f5.vercel.app",
+    "https://saa-thi.vercel.app/" # <-- Add your Vercel frontend URL here
 ]
 
 def setup_cors(app):
